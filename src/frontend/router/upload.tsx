@@ -5,14 +5,8 @@ import { GlobalState, GlobalActions } from "../store/index";
 import FileIcon from "../components/fileIcon";
 import { selectFiles, readFile } from "../store/ipc";
 import { getModlist } from "../store/pure";
-import { setUserState } from "../store/local";
 
-import { UploadFile } from "../../types";
-
-type SelectOption = {
-  display: string;
-  value: string;
-}
+import { UploadFile, UploadFiles, SelectOption, UploadForm } from "../../types";
 
 const games: Array<SelectOption> = [
   {
@@ -50,22 +44,27 @@ const modManagers: Array<SelectOption> = [{
   value: "other"
 }];
 
-export default class Upload extends Component<GlobalState & GlobalActions, {
-  form: Partial<Modlist>
+interface UploadProps extends GlobalActions, GlobalState {
+  local?: boolean;
+}
+export default class Upload extends Component<UploadProps, {
+  form: UploadForm;
+  readingFiles: boolean;
 }> {
   state = {
     form: {
-      username: undefined,
-      password: undefined,
-      tag: undefined,
-      enb: undefined,
-      plugins: undefined,
-      modlist: undefined,
-      ini: undefined,
-      prefsini: undefined,
+      username: "",
+      password: "",
+      tag: "",
+      enb: "",
+      plugins: null,
+      modlist: null,
+      ini: null,
+      prefsini: null,
       game: "" as Game,
       modmanager: ""
-    }
+    },
+    readingFiles: false
   }
   setForm = ev => {
     const key = ev.target.id;
@@ -78,28 +77,67 @@ export default class Upload extends Component<GlobalState & GlobalActions, {
     }));
   }
   selectFiles = async ({ game, filename}) => {
+    this.setState(() => ({
+      readingFiles: true
+    }));
     const filePaths = await selectFiles({ game, filename });
     const rawFiles = await readFile(filePaths);
-    const mapped: UploadFile = rawFiles.map(rawFile => ({
+    this.setState(() => ({
+      readingFiles: false
+    }));
+    const mapped: UploadFile[] = rawFiles.map(rawFile => ({
       ...rawFile,
       content: rawFile.content.replace(/\r/g, "").split("\n")
     }));
-    const files = {}
-    for(let [key, value] of Object.entries(mapped)) {
-      files[key] = value;
-    }
-    setUserState({
-      ...this.props.user,
-      files: {
-        ...this.props.user.files,
-        ...files
+    const files: UploadFiles = {};
+    const filenames: string[] = [];
+    for(const value of mapped) {
+      let name;
+      if(value.name.includes("plugins")) {
+        name = "plugins";
+      } else if(value.name.includes("modlist")) {
+        name = "modlist";
+      } else if(value.name.includes("prefs")) {
+        name = "prefs";
+      } else if(value.name.includes("ini")) {
+        name = "ini";
+      } else {
+        console.log("error mapping filename");
+        this.props.addNotification("Filename not recognized", {
+          type: "error"
+        });
+        continue;
       }
-    })
-    console.log(mapped);
+      files[name] = value;
+      filenames.push(name);
+    }
+    debugger;
+    this.props.addFiles(files);
   }
   async componentDidMount() {
     if(this.props.user.username) {
-      await getModlist({ username: this.props.user.username });
+      if(!this.props.local) {
+        const modlist = await getModlist({ username: this.props.user.username });
+        this.setState(({ form }) => ({
+          form: {
+            ...form,
+            tag: modlist.tag,
+            end: modlist.enb
+          }
+        }))
+      } else {
+        let filesToAdd = {};
+        this.setState(() => ({
+          readingFiles: true
+        }));
+        for(const key in this.props.user.files) {
+          filesToAdd[key] = await readFile(this.props.user.files[key].path);
+        }
+        this.setState(() => ({
+          readingFiles: false
+        }));
+        this.props.addFiles(filesToAdd);
+      }
     }
   }
   render() {
@@ -120,11 +158,11 @@ export default class Upload extends Component<GlobalState & GlobalActions, {
           <div>
             <div>
               <label class="sr-only" for="tag">Tag</label>
-              <input id="tag" name="tag" placeholder="Tag" onChange={this.setForm} type="text"/>
+              <input id="tag" name="tag" placeholder="Tag" onChange={this.setForm} value={this.state.form.tag} type="text"/>
             </div>
             <div>
               <label class="sr-only" for="enb">ENB</label>
-              <input id="enb" name="enb" placeholder="ENB" onChange={this.setForm} type="text"/>
+              <input id="enb" name="enb" placeholder="ENB" onChange={this.setForm} value={this.state.form.enb} type="text"/>
             </div>
           </div>
           <div>
@@ -149,22 +187,22 @@ export default class Upload extends Component<GlobalState & GlobalActions, {
               </select>
             </div>
           </div>
-          <div class="files">
+          <div class="files" disabled={this.state.readingFiles}>
             <div class="file" onClick={e => this.selectFiles({ filename: "plugins", game: this.state.form.game })}>
               <FileIcon />
-              plugins.txt
+              <span>plugins.txt</span>
             </div>
             {this.state.form.modmanager !== "nexusmodmanager" && <div class="file" onClick={e => this.selectFiles({ filename: "plugins", game: this.state.form.game })}>
               <FileIcon />
-              modlist.txt
+              <span>modlist.txt</span>
             </div>}
             <div class="file" onClick={e => this.selectFiles({ filename: "plugins", game: this.state.form.game })}>
               <FileIcon />
-              {this.state.form.game || "game"}.ini
+              <span>{this.state.form.game || "game"}.ini</span>
             </div>
             <div class="file" onClick={e => this.selectFiles({ filename: "plugins", game: this.state.form.game })}>
               <FileIcon />
-              {this.state.form.game || "game"}prefs.ini
+              <span>{this.state.form.game || "game"}prefs.ini</span>
             </div>
           </div>
         </form>

@@ -1,8 +1,8 @@
 import createStore from "unistore";
 import jwtDecode from "jwt-decode";
 
-import { Notification, User, RemoveFirstFromTuple } from "@modwatch/types";
-import { UploadUser } from "../../types";
+import { Notification, RemoveFirstFromTuple } from "@modwatch/types";
+import { UploadUser, UploadFiles } from "../../types";
 import { addNotification, removeNotification } from "@modwatch/core/src/store/index";
 
 import { clearUserState, setUserState, getUserState, getUsers } from "./local";
@@ -20,6 +20,7 @@ export type GlobalState = {
 export type GlobalActions = {
   login(props?: {token: string}): Promise<void>,
   logout(): void,
+  addFiles(files: UploadFiles),
   addNotification(...args: RemoveFirstFromTuple<Parameters<typeof addNotification>>): void,
   removeNotification(...args: RemoveFirstFromTuple<Parameters<typeof removeNotification>>): void
 };
@@ -29,6 +30,7 @@ export const rawState: GlobalState = {
   user: {
     username: undefined,
     scopes: [],
+    files: {},
     ...localUser,
     authenticated: false
   },
@@ -54,7 +56,6 @@ export const actions = store => ({
       } catch(e) {
         store.setState({
           awaitingIpc: false,
-          ...state,
           user: clearUserState()
         });
         throw e;
@@ -62,37 +63,71 @@ export const actions = store => ({
       store.setState({
         awaitingIpc: false
       });
+      const { sub, scopes } = jwtDecode(token);
+      setUserState({
+        token,
+        authenticated: true,
+        username: sub,
+        files: {},
+        scopes
+      });
     }
-    const { sub, scopes } = jwtDecode(token);
-    const user = {
-      token,
-      authenticated: true,
-      username: sub,
-      scopes
-    };
-    setUserState(user);
-    const userIndex = state.users.findIndex(({ username }) => username === state.user.username);
+    const { user, users } = store.getState();
+    const userIndex = users.findIndex(({ username }) => username === user.username);
     return {
-      ...state,
       user,
       users: userIndex !== -1 ? [
-        ...state.users.slice(0, userIndex),
+        ...users.slice(0, userIndex),
         user,
-        ...state.users.slice(userIndex + 1)
-      ] : state.users.concat(user)
+        ...users.slice(userIndex + 1)
+      ] : users.concat(user)
     };
   },
-  logout(state: GlobalState) {
-    const userIndex = state.users.findIndex(({ username }) => username === state.user.username);
+  logout({ user, users }: GlobalState) {
+    const userIndex = users.findIndex(({ username }) => username === user.username);
     return {
-      ...state,
       user: clearUserState(),
       users: userIndex !== -1 ? [
-        ...state.users.slice(0, userIndex),
-        ...state.users.slice(userIndex + 1)
-      ] : state.users
+        ...users.slice(0, userIndex),
+        ...users.slice(userIndex + 1)
+      ] : users
+    };
+  },
+  addFiles({ user, users }: GlobalState, files: UploadFiles) {
+    setUserState({
+      ...user,
+      files: {
+        ...user.files,
+        ...removeContentFromFiles(files)
+      }
+    });
+    const userIndex = users.findIndex(({ username }) => username === user.username);
+    return {
+      user: {
+        ...user,
+        files: {
+          ...user.files,
+          ...files
+        }
+      },
+      users: userIndex !== -1 ? [
+        ...users.slice(0, userIndex),
+        user,
+        ...users.slice(userIndex + 1)
+      ] : users.concat(user)
     };
   },
   addNotification,
   removeNotification
 });
+
+function removeContentFromFiles(files: UploadFiles) {
+  const _files = {};
+  for(let key in files) {
+    _files[key] = {
+      ...files[key],
+      content: undefined
+    }
+  }
+  return _files;
+}

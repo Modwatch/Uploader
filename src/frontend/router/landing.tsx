@@ -3,7 +3,7 @@ import { useState } from 'preact/hooks';
 import { route } from "preact-router";
 import { GlobalState, GlobalActions } from "../store/index";
 
-export default (props: GlobalState & GlobalActions) => {
+export default function(props: GlobalState & GlobalActions) {
   const [token, setToken] = useState(props.users[0]?.token);
   return (
     <Fragment>
@@ -14,7 +14,7 @@ export default (props: GlobalState & GlobalActions) => {
       <section class="link" onClick={async e => {
         try {
           await props.login();
-          route("/upload");
+          route(`/upload/${props.user.username}`);
         } catch(e) {
           props.addNotification("Login Failed", {
             type: "error"
@@ -31,7 +31,16 @@ export default (props: GlobalState & GlobalActions) => {
             <option value={user.token}>{user.username}</option>
           ))}
         </select>
-        <button onClick={async e => (await props.login({ token }), route("/upload"))}>Login</button>
+        <button onClick={async e => {
+          try {
+            await props.login({ token });
+            route(`/upload/${props.user.username}?local=true`)
+          } catch(e) {
+            props.addNotification("Login Failed", {
+              type: "error"
+            });
+          }
+        }}>Login</button>
         <p>If you have already logged in from this machine, you can select a username from the list above</p>
       </section>}
     </Fragment>

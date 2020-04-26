@@ -60,4 +60,8 @@ section.link {
       }
     }
   }
+  & .files[disabled] .file {
+    pointer-events: none;
+    opacity: 0.5;
+  }
 }

@@ -19,12 +19,17 @@ export async function readFile(path): Promise<any> {
 }
 
 export async function ipcBuilder<T = any>(name: string, ...args): Promise<T | string> {
+  console.log("ipc received");
   return new Promise((resolve, reject) => {
     ipcRenderer.send(name, args);
+    console.log(`ipc: ${name} sent`);
     ipcRenderer.once(name, (event, response: T | string) => {
+      console.log(`ipc: ${name} received`);
       if(typeof response !== "string" || response.indexOf("ERROR:") !== 0) {
+        console.log(`ipc: ${name} resolved`);
         resolve(response);
       } else {
+        console.log(`ipc: ${name} rejected`);
         reject(response.slice(6));
       }
     });

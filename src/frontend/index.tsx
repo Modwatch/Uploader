@@ -25,6 +25,7 @@ class Root extends Component<GlobalState & GlobalActions, {}> {
   componentDidMount = async () => {
     if (this.props.user && this.props.user.token && await verify(this.props.user.token)) {
       await this.props.login({ token: this.props.user.token });
+      route(`/upload/${this.props.user.username}?local=true`);
       setTimeout(
         () =>
           this.props.addNotification(

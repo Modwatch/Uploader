@@ -4,7 +4,6 @@ import { promisify } from "util";
 import sucrase from "rollup-plugin-sucrase";
 import postcss from "rollup-plugin-postcss";
 import postcssNesting from "postcss-nesting";
-import postcssCustomProperties from "postcss-custom-properties";
 import postcssURL from "postcss-url";
 import nodeResolve from "rollup-plugin-node-resolve";
 import commonjs from "rollup-plugin-commonjs";
@@ -36,7 +35,7 @@ export default async () => ({
     dir: path.resolve(__dirname, `dist/${env.TARGET}/`),
     entryFileNames: "[name]-[hash].js",
     assetFileNames: "[name]-[hash]",
-    format: "amd"
+    format: "umd"
   },
   external: [
     "electron"
@@ -93,17 +92,17 @@ export default async () => ({
           isolatedModules: env.NODE_ENV === "production",
           target: "es6"
         }),
-      OMT({
-        loader: (await readFileAsync(
-          path.resolve("./node_modules/@modwatch/core/loadz0r/loader.min.js"),
-          "utf8"
-        )).replace(
-          /process\.env\.PUBLIC_PATH/g,
-          JSON.stringify(`dist/frontend`)
-        ),
-        prependLoader: (chunk, workerFiles) =>
-          (chunk.isEntry || workerFiles.includes(chunk.facadeModuleId))
-      })
+      // OMT({
+      //   // loader: (await readFileAsync(
+      //   //   path.resolve("../core/loadz0r/loader.js"),
+      //   //   "utf8"
+      //   // )).replace(
+      //   //   /process\.env\.PUBLIC_PATH/g,
+      //   //   JSON.stringify(`dist/frontend`)
+      //   // ),
+      //   prependLoader: (chunk, workerFiles) =>
+      //     (chunk.isEntry || workerFiles.includes(chunk.facadeModuleId))
+      // })
   ]
     .concat(
       env.TARGET === "frontend"
@@ -117,10 +116,6 @@ export default async () => ({
               extract: true,
               plugins: [
                 postcssNesting(),
-                // postcssCustomProperties({
-                //   importFrom: path.resolve("./node_modules/@modwatch/core/src/properties.css"),
-                //   preserve: false
-                // }),
                 postcssURL({
                   url: "inline"
                 })
