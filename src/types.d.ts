@@ -10,6 +10,7 @@ type UploadFiles = {
 }
 interface UploadUser extends User {
   files: UploadFiles;
+  selected: boolean;
 }
 type SelectOption = {
   display: string;

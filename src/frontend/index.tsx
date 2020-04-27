@@ -23,13 +23,14 @@ NODE_ENV:\t${process.env.NODE_ENV}`);
 
 class Root extends Component<GlobalState & GlobalActions, {}> {
   componentDidMount = async () => {
-    if (this.props.user && this.props.user.token && await verify(this.props.user.token)) {
-      await this.props.login({ token: this.props.user.token });
-      route(`/upload/${this.props.user.username}?local=true`);
+    const user = this.props.getSelectedUser();
+    if (user && user.token && await verify(user.token)) {
+      await this.props.login({ token: user.token });
+      route(`/upload/${user.username}?local=true`);
       setTimeout(
         () =>
           this.props.addNotification(
-            `Welcome Back, ${this.props.user.username}`
+            `Welcome Back, ${user.username}`
           ),
         1
       );
@@ -39,7 +40,7 @@ class Root extends Component<GlobalState & GlobalActions, {}> {
   }
   login = async () => {
     await this.props.login();
-    this.props.addNotification(`Welcome, ${this.props.user.username}`);
+    this.props.addNotification(`Welcome, ${this.props.getSelectedUser().username}`);
     route("/upload");
   }
   logout = async () => {
@@ -48,15 +49,16 @@ class Root extends Component<GlobalState & GlobalActions, {}> {
     route("/landing");
   }
   render() {
+    const user = this.props.getSelectedUser();
     return (
       <div class={this.props.awaitingIpc ? "loading" : ""}>
         <ModwatchNotifications {...this.props} />
         <ModwatchNav {...this.props}>
-          {this.props.user.authenticated ?
+          {user && user.authenticated ?
             <Fragment>
               <div class="nav-block" style={{
                 pointerEvents: "none"
-              }}>{this.props.user.username}</div>
+              }}>{user.username}</div>
               <div class="nav-block" onClick={e => this.logout()}>Logout</div>
             </Fragment> : 
             <div class="nav-block" onClick={e => this.login()}>Login</div>

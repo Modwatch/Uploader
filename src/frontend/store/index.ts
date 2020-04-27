@@ -5,35 +5,28 @@ import { Notification, RemoveFirstFromTuple } from "@modwatch/types";
 import { UploadUser, UploadFiles } from "../../types";
 import { addNotification, removeNotification } from "@modwatch/core/src/store/index";
 
-import { clearUserState, setUserState, getUserState, getUsers } from "./local";
+import { setUsers, getUsers } from "./local";
 import { getToken } from "./ipc";
+import { verify } from "../store/pure";
 
-const localUser = getUserState();
 const localUsers = getUsers();
 
 export type GlobalState = {
   users: UploadUser[];
-  user: UploadUser;
   notifications: Notification[];
   awaitingIpc: boolean;
 }
 export type GlobalActions = {
-  login(props?: {token: string}): Promise<void>,
-  logout(): void,
-  addFiles(files: UploadFiles),
-  addNotification(...args: RemoveFirstFromTuple<Parameters<typeof addNotification>>): void,
-  removeNotification(...args: RemoveFirstFromTuple<Parameters<typeof removeNotification>>): void
+  login(props?: {token: string}): Promise<void>;
+  logout(): void;
+  addFiles(files: UploadFiles);
+  addNotification(...args: RemoveFirstFromTuple<Parameters<typeof addNotification>>): void;
+  removeNotification(...args: RemoveFirstFromTuple<Parameters<typeof removeNotification>>): void;
+  getSelectedUser(): UploadUser | undefined;
 };
 
 export const rawState: GlobalState = {
   users: localUsers,
-  user: {
-    username: undefined,
-    scopes: [],
-    files: {},
-    ...localUser,
-    authenticated: false
-  },
   awaitingIpc: false,
   notifications: []
 };
@@ -43,10 +36,14 @@ let _store = createStore(rawState);
 export const store = _store;
 
 export const actions = store => ({
-  async login(state: GlobalState, props?: {
+  getSelectedUser({ users }: GlobalState) {
+    return users.find(({ selected }) => selected);
+  },
+  async login({ users }: GlobalState, props?: {
     token: string
   }) {
     let { token } = props || {};
+    let _users = [...users];
     if(!token) {
       store.setState({
         awaitingIpc: true
@@ -55,8 +52,7 @@ export const actions = store => ({
         token = await getToken();
       } catch(e) {
         store.setState({
-          awaitingIpc: false,
-          user: clearUserState()
+          awaitingIpc: false
         });
         throw e;
       }
@@ -64,57 +60,52 @@ export const actions = store => ({
         awaitingIpc: false
       });
       const { sub, scopes } = jwtDecode(token);
-      setUserState({
-        token,
-        authenticated: true,
-        username: sub,
-        files: {},
-        scopes
-      });
-    }
-    const { user, users } = store.getState();
-    const userIndex = users.findIndex(({ username }) => username === user.username);
-    return {
-      user,
-      users: userIndex !== -1 ? [
-        ...users.slice(0, userIndex),
-        user,
-        ...users.slice(userIndex + 1)
-      ] : users.concat(user)
-    };
-  },
-  logout({ user, users }: GlobalState) {
-    const userIndex = users.findIndex(({ username }) => username === user.username);
-    return {
-      user: clearUserState(),
-      users: userIndex !== -1 ? [
-        ...users.slice(0, userIndex),
-        ...users.slice(userIndex + 1)
-      ] : users
-    };
-  },
-  addFiles({ user, users }: GlobalState, files: UploadFiles) {
-    setUserState({
-      ...user,
-      files: {
-        ...user.files,
-        ...removeContentFromFiles(files)
-      }
-    });
-    const userIndex = users.findIndex(({ username }) => username === user.username);
-    return {
-      user: {
-        ...user,
-        files: {
-          ...user.files,
-          ...files
+      _users = setUsers([
+        ...users.map(user => ({
+          ...user,
+          selected: false
+        })),
+        {
+          token,
+          authenticated: true,
+          username: sub,
+          files: {},
+          scopes,
+          selected: true
         }
-      },
-      users: userIndex !== -1 ? [
+      ]);
+    } else {
+      try {
+        await verify(token);
+      } catch(e) {
+        console.log("Failed to verify token parameter");
+        throw e;
+      }
+    }
+    console.log(_users);
+    return {
+      _users
+    };
+  },
+  logout({ users }: GlobalState) {
+    return {
+      users: setUsers(users.filter(({ selected }) => !selected))
+    };
+  },
+  addFiles({ users }: GlobalState, files: UploadFiles) {
+    const userIndex = users.findIndex(({ selected }) => selected);
+    return {
+      users: setUsers([
         ...users.slice(0, userIndex),
-        user,
-        ...users.slice(userIndex + 1)
-      ] : users.concat(user)
+        {
+          ...users[userIndex],
+          files: {
+            ...users[userIndex].files,
+            ...removeContentFromFiles(files)
+          }
+        },
+        ...users.slice(userIndex + 1),
+      ])
     };
   },
   addNotification,

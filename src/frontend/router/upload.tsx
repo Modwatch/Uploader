@@ -111,13 +111,13 @@ export default class Upload extends Component<UploadProps, {
       files[name] = value;
       filenames.push(name);
     }
-    debugger;
     this.props.addFiles(files);
   }
   async componentDidMount() {
-    if(this.props.user.username) {
+    const user = this.props.getSelectedUser();
+    if(user && user.username) {
       if(!this.props.local) {
-        const modlist = await getModlist({ username: this.props.user.username });
+        const modlist = await getModlist({ username: user.username });
         this.setState(({ form }) => ({
           form: {
             ...form,
@@ -130,8 +130,8 @@ export default class Upload extends Component<UploadProps, {
         this.setState(() => ({
           readingFiles: true
         }));
-        for(const key in this.props.user.files) {
-          filesToAdd[key] = await readFile(this.props.user.files[key].path);
+        for(const key in user.files) {
+          filesToAdd[key] = await readFile(user.files[key].path);
         }
         this.setState(() => ({
           readingFiles: false
@@ -141,11 +141,12 @@ export default class Upload extends Component<UploadProps, {
     }
   }
   render() {
+    const user = this.props.getSelectedUser();
     return (
       <section>
         <h1>Upload</h1>
         <form class="upload-form">
-          {!this.props.user.authenticated ? <div>
+          {!user.authenticated ? <div>
             <div>
               <label class="sr-only" for="username">Username</label>
               <input required id="username" name="username" placeholder="Username" onChange={this.setForm} type="text"/>
@@ -154,7 +155,7 @@ export default class Upload extends Component<UploadProps, {
               <label class="sr-only" for="password">Password</label>
               <input required id="password" name="password" placeholder="Password" onChange={this.setForm} type="password"/>
             </div>
-          </div> : <div>{this.props.user.username}</div>}
+          </div> : <div>{user.username}</div>}
           <div>
             <div>
               <label class="sr-only" for="tag">Tag</label>

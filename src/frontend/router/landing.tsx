@@ -14,8 +14,10 @@ export default function(props: GlobalState & GlobalActions) {
       <section class="link" onClick={async e => {
         try {
           await props.login();
-          route(`/upload/${props.user.username}`);
+          debugger;
+          route(`/upload/${props.getSelectedUser().username}`);
         } catch(e) {
+          console.log("Login error", e);
           props.addNotification("Login Failed", {
             type: "error"
           });
@@ -34,7 +36,7 @@ export default function(props: GlobalState & GlobalActions) {
         <button onClick={async e => {
           try {
             await props.login({ token });
-            route(`/upload/${props.user.username}?local=true`)
+            route(`/upload/${props.getSelectedUser().username}?local=true`)
           } catch(e) {
             props.addNotification("Login Failed", {
               type: "error"
